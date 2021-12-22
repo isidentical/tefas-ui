@@ -233,14 +233,19 @@ def display_pl(funds: List[Fund], currency: str = BASE_CURRENCY) -> None:
             )
 
         table.add_row(
-            "N/A",
-            "Total Portfolio",
-            "N/A",
-            "N/A",
-            annotate(total["total_worth"], use_color=False),
-            annotate(total["pl_today"]),
-            annotate(total["pl_week"]),
-            annotate(total["pl_all_time"]),
+            *[
+                f"[bold]{text}[/bold]"
+                for text in (
+                    "N/A",
+                    "Total Portfolio",
+                    "N/A",
+                    "N/A",
+                    annotate(total["total_worth"], use_color=False),
+                    annotate(total["pl_today"]),
+                    annotate(total["pl_week"]),
+                    annotate(total["pl_all_time"]),
+                )
+            ]
         )
 
 
