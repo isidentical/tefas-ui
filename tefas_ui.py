@@ -83,11 +83,11 @@ def ui(console: Console):
     table.add_column("Name")
     table.add_column("Title")
     table.add_column("Purchase Date")
-    table.add_column("Total Shares")
-    table.add_column("Total Worth")
-    table.add_column("P/L (today)")
-    table.add_column("P/L (this week)")
-    table.add_column("P/L (all time)")
+    table.add_column("Total Shares", justify="right")
+    table.add_column("Total Worth", justify="right")
+    table.add_column("P/L (today)", justify="right")
+    table.add_column("P/L (this week)", justify="right")
+    table.add_column("P/L (all time)", justify="right")
     yield table
     console.print(table)
 
@@ -96,15 +96,18 @@ def display_pl(funds: List[Fund]) -> None:
     tefas = Crawler()
     rows = []
 
-    def annotate(price: float) -> str:
-        if price > 0:
-            color = "green"
-        elif price < 0:
-            color = "red"
+    def annotate(price: float, use_color: bool = True) -> str:
+        if use_color:
+            if price > 0:
+                color = "green"
+            elif price < 0:
+                color = "red"
+            else:
+                color = "yellow"
         else:
-            color = "yellow"
+            color = "white"
 
-        return f"[{color}]{price}[/{color}]"
+        return f"[{color}]{price:6.4f}[/{color}] TRY"
 
     today = datetime.now()
     for fund in track(
@@ -134,7 +137,7 @@ def display_pl(funds: List[Fund]) -> None:
                 current_data.title[0],
                 str(initial_date),
                 total_shares,
-                total_worth,
+                annotate(total_worth, use_color=False),
                 annotate(total_worth - total_worth_yesterday),
                 annotate(total_worth - total_worth_7_days_ago),
                 annotate(total_worth - total_spent),
