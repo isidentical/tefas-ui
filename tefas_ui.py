@@ -5,12 +5,30 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
+from functools import partial
 from typing import Dict, Iterator, List, Optional, Tuple
 
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
 from tefas import Crawler
+
+BASE_CURRENCY = "TRY"
+
+try:
+    from forex_python.converter import get_rate
+except Exception:
+
+    def get_rate(
+        c1: str, c2: str, date: Optional[datetime.date] = None
+    ) -> float:
+        assert (
+            c1 == c2 == BASE_CURRENCY
+        ), "install forex-python for other currencies"
+        return 1.0
+
+
+fx_rate = partial(get_rate, BASE_CURRENCY)
 
 
 class ActionKind(Enum):
@@ -31,13 +49,17 @@ class Fund:
     key: str
     actions: List[Action] = field(default_factory=list, repr=False)
 
-    def share_info(self) -> Tuple[float, float]:
+    def share_info(self, currency: str = BASE_CURRENCY) -> Tuple[float, float]:
         total_shares = 0
         total_spent = 0
         for action in self.actions:
             assert action.kind is ActionKind.BUY
             total_shares += action.num_shares
-            total_spent += action.num_shares * action.share_price
+            total_spent += (
+                action.num_shares
+                * action.share_price
+                * fx_rate(currency, action.date)
+            )
         return total_shares, total_spent
 
     def deduct_sales(self) -> None:
@@ -92,7 +114,7 @@ def ui(console: Console):
     console.print(table)
 
 
-def display_pl(funds: List[Fund]) -> None:
+def display_pl(funds: List[Fund], currency: str = BASE_CURRENCY) -> None:
     tefas = Crawler()
     rows = []
 
@@ -107,7 +129,7 @@ def display_pl(funds: List[Fund]) -> None:
         else:
             color = "white"
 
-        return f"[{color}]{price:6.4f}[/{color}] TRY"
+        return f"[{color}]{price:6.4f}[/{color}] {currency}"
 
     today = datetime.now()
     for fund in track(
@@ -117,19 +139,31 @@ def display_pl(funds: List[Fund]) -> None:
     ):
         assert len(fund.actions) >= 1
         initial_date = fund.actions[0].date
-        total_shares, total_spent = fund.share_info()
+        total_shares, total_spent = fund.share_info(currency)
 
         current_data = tefas.fetch(
             start=today - timedelta(days=8),
             end=today,
             name=fund.key,
-            columns=["price", "title"],
+            columns=["price", "title", "date"],
         )
 
         assert len(current_data) >= 7
-        total_worth = total_shares * current_data.price[0].item()
-        total_worth_yesterday = total_shares * current_data.price[1].item()
-        total_worth_7_days_ago = total_shares * current_data.price[6].item()
+        total_worth = (
+            total_shares
+            * current_data.price[0].item()
+            * fx_rate(currency, today)
+        )
+        total_worth_yesterday = (
+            total_shares
+            * current_data.price[1].item()
+            * fx_rate(currency, current_data.date[1])
+        )
+        total_worth_7_days_ago = (
+            total_shares
+            * current_data.price[6].item()
+            * fx_rate(currency, current_data.date[6])
+        )
 
         rows.append(
             (
@@ -185,7 +219,7 @@ class Teb(ExportFormat):
                 _,
                 num_shares,
                 share_price,
-                _,
+                currency,
                 _,
             ) = line.split("\t")
             key, _ = mixed_name.split("-")
@@ -209,14 +243,14 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser = ArgumentParser()
     parser.add_argument("input_file")
     parser.add_argument("file_format", choices=EXPORT_FORMATS.keys())
-
+    parser.add_argument("--currency", type=str, default="TRY")
     options = parser.parse_args(argv)
     with open(options.input_file) as stream:
         file_format = EXPORT_FORMATS[options.file_format]()
         funds = file_format.process(stream.read())
 
     funds = list(drop_sold_funds(funds))
-    display_pl(funds)
+    display_pl(funds, options.currency)
 
 
 if __name__ == "__main__":
