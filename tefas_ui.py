@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from argparse import ArgumentParser, FileType
-from collections import defaultdict
+from collections import Counter, defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
@@ -43,6 +43,15 @@ class Profits:
     pl_today: float
     pl_week: float
     pl_all_time: float
+
+    @property
+    def simple(self) -> Dict[str, float]:
+        return {
+            "total_worth": self.total_worth,
+            "pl_today": self.pl_today,
+            "pl_week": self.pl_week,
+            "pl_all_time": self.pl_all_time,
+        }
 
 
 class ActionKind(Enum):
@@ -209,7 +218,9 @@ def display_pl(funds: List[Fund], currency: str = BASE_CURRENCY) -> None:
 
     console = Console()
     with ui(console) as table:
+        total = Counter()
         for profits in get_profits(funds, currency):
+            total.update(profits.simple)
             table.add_row(
                 profits.key,
                 profits.title,
@@ -220,6 +231,17 @@ def display_pl(funds: List[Fund], currency: str = BASE_CURRENCY) -> None:
                 annotate(profits.pl_week),
                 annotate(profits.pl_all_time),
             )
+
+        table.add_row(
+            "N/A",
+            "Total Portfolio",
+            "N/A",
+            "N/A",
+            annotate(total["total_worth"], use_color=False),
+            annotate(total["pl_today"]),
+            annotate(total["pl_week"]),
+            annotate(total["pl_all_time"]),
+        )
 
 
 EXPORT_FORMATS = {}
