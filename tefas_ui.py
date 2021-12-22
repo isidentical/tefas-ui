@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import sys
 from argparse import ArgumentParser, FileType
 from collections import defaultdict
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
 from functools import lru_cache, partial
@@ -31,6 +33,18 @@ except Exception:
 fx_rate = partial(lru_cache(get_rate), BASE_CURRENCY)
 
 
+@dataclass
+class Profits:
+    key: str
+    title: str
+    initial_date: datetime.date
+    total_shares: int
+    total_worth: float
+    pl_today: float
+    pl_week: float
+    pl_all_time: float
+
+
 class ActionKind(Enum):
     BUY = auto()
     SELL = auto()
@@ -50,6 +64,9 @@ class Fund:
     actions: List[Action] = field(default_factory=list, repr=False)
 
     def share_info(self, currency: str = BASE_CURRENCY) -> Tuple[float, float]:
+        """Return the total spent amount (with the FX conversion by the date it was spent),
+        and the total number of shares."""
+
         total_shares = 0
         total_spent = 0
         for action in self.actions:
@@ -62,7 +79,56 @@ class Fund:
             )
         return total_shares, total_spent
 
-    def deduct_sales(self) -> None:
+    def calculate_profits(
+        self,
+        tefas: Crawler,
+        currency: str = BASE_CURRENCY,
+        start=datetime.now(),
+    ) -> Profits:
+        """Calculate daily, weekly and all time P/L in the specified currency."""
+
+        assert len(self.actions) >= 1
+        assert all(action.kind is ActionKind.BUY for action in self.actions)
+
+        initial_date = self.actions[0].date
+        total_shares, total_spent = self.share_info(currency)
+
+        current_data = tefas.fetch(
+            start=start - timedelta(days=8),
+            end=start,
+            name=self.key,
+            columns=["price", "title", "date"],
+        )
+
+        assert len(current_data) >= 7
+        total_worth = (
+            total_shares
+            * current_data.price[0].item()
+            * fx_rate(currency, start.date())
+        )
+        total_worth_yesterday = (
+            total_shares
+            * current_data.price[1].item()
+            * fx_rate(currency, current_data.date[1])
+        )
+        total_worth_7_days_ago = (
+            total_shares
+            * current_data.price[6].item()
+            * fx_rate(currency, current_data.date[6])
+        )
+
+        return Profits(
+            self.key,
+            current_data.title[0],
+            initial_date,
+            total_shares,
+            total_worth,
+            total_worth - total_worth_yesterday,
+            total_worth - total_worth_7_days_ago,
+            total_worth - total_spent,
+        )
+
+    def deduct_sales(self) -> Fund:
         """Deduct sales in a FIFO fashion."""
         actions = sorted(self.actions, key=lambda action: action.date)
 
@@ -89,14 +155,26 @@ class Fund:
         for sell in sells.copy():
             deduct_shares(sell.num_shares)
 
-        self.actions = buys
+        return replace(self, actions=buys)
 
 
 def drop_sold_funds(funds: List[Fund]) -> Iterator[Fund]:
     for fund in funds.copy():
-        fund.deduct_sales()
-        if fund.actions:
-            yield fund
+        new_fund = fund.deduct_sales()
+        if new_fund.actions:
+            yield new_fund
+
+
+def get_profits(
+    funds: List[Fund], currency: str = BASE_CURRENCY
+) -> Iterator[Profits]:
+    tefas = Crawler()
+    for fund in track(
+        funds,
+        transient=True,
+        description="Fetching the latest data from TEFAS...",
+    ):
+        yield fund.calculate_profits(tefas, currency)
 
 
 @contextmanager
@@ -131,57 +209,19 @@ def display_pl(funds: List[Fund], currency: str = BASE_CURRENCY) -> None:
 
         return f"[{color}]{price:6.4f}[/{color}] {currency}"
 
-    today = datetime.now()
-    for fund in track(
-        funds,
-        transient=True,
-        description="Fetching the latest data from TEFAS...",
-    ):
-        assert len(fund.actions) >= 1
-        initial_date = fund.actions[0].date
-        total_shares, total_spent = fund.share_info(currency)
-
-        current_data = tefas.fetch(
-            start=today - timedelta(days=8),
-            end=today,
-            name=fund.key,
-            columns=["price", "title", "date"],
-        )
-
-        assert len(current_data) >= 7
-        total_worth = (
-            total_shares
-            * current_data.price[0].item()
-            * fx_rate(currency, today)
-        )
-        total_worth_yesterday = (
-            total_shares
-            * current_data.price[1].item()
-            * fx_rate(currency, current_data.date[1])
-        )
-        total_worth_7_days_ago = (
-            total_shares
-            * current_data.price[6].item()
-            * fx_rate(currency, current_data.date[6])
-        )
-
-        rows.append(
-            (
-                fund.key,
-                current_data.title[0],
-                str(initial_date),
-                total_shares,
-                annotate(total_worth, use_color=False),
-                annotate(total_worth - total_worth_yesterday),
-                annotate(total_worth - total_worth_7_days_ago),
-                annotate(total_worth - total_spent),
-            )
-        )
-
     console = Console()
     with ui(console) as table:
-        for row in rows:
-            table.add_row(*map(str, row))
+        for profits in get_profits(funds, currency):
+            table.add_row(
+                profits.key,
+                profits.title,
+                str(profits.initial_date),
+                str(profits.total_shares),
+                annotate(profits.total_worth, use_color=False),
+                annotate(profits.pl_today),
+                annotate(profits.pl_week),
+                annotate(profits.pl_all_time),
+            )
 
 
 EXPORT_FORMATS = {}
