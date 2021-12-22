@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
-from functools import partial
+from functools import lru_cache, partial
 from typing import Dict, Iterator, List, Optional, Tuple
 
 from rich.console import Console
@@ -28,7 +28,7 @@ except Exception:
         return 1.0
 
 
-fx_rate = partial(get_rate, BASE_CURRENCY)
+fx_rate = partial(lru_cache(get_rate), BASE_CURRENCY)
 
 
 class ActionKind(Enum):
