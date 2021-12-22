@@ -101,30 +101,28 @@ class Fund:
         )
 
         assert len(current_data) >= 7
-        total_worth = (
-            total_shares
-            * current_data.price[0].item()
-            * fx_rate(currency, start.date())
-        )
-        total_worth_yesterday = (
-            total_shares
-            * current_data.price[1].item()
-            * fx_rate(currency, current_data.date[1])
-        )
-        total_worth_7_days_ago = (
-            total_shares
-            * current_data.price[6].item()
-            * fx_rate(currency, current_data.date[6])
-        )
 
+        pricing_info = {}
+        for key, index in [
+            ("current", 0),
+            ("daily", 1),
+            ("weekly", 6),
+        ]:
+            pricing_info[key] = (
+                total_shares
+                * current_data.price[index].item()
+                * fx_rate(currency, current_data.date[index])
+            )
+
+        total_worth = pricing_info["current"]
         return Profits(
             self.key,
             current_data.title[0],
             initial_date,
             total_shares,
             total_worth,
-            total_worth - total_worth_yesterday,
-            total_worth - total_worth_7_days_ago,
+            total_worth - pricing_info["daily"],
+            total_worth - pricing_info["weekly"],
             total_worth - total_spent,
         )
 
