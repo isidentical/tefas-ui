@@ -109,13 +109,11 @@ class Fund:
             columns=["price", "title", "date"],
         )
 
-        assert len(current_data) >= 7
-
         pricing_info = {}
         for key, index in [
             ("current", 0),
             ("daily", 1),
-            ("weekly", 6),
+            ("weekly", len(current_data) - 1),
         ]:
             pricing_info[key] = (
                 total_shares

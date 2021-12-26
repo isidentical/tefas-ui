@@ -37,3 +37,18 @@ def test_basic_operations(
 
     result = command("--currency", currency, input_file, format)
     assert result == output_file.read_text()
+
+
+@freeze_time("2021-12-25")
+@pytest.mark.parametrize(
+    "format, currency, input_file_name, output_file_name",
+    [("teb", "try", "teb.txt", "teb_try_weekend.txt")],
+)
+def test_basic_operations_weekend(
+    command, format, currency, input_file_name, output_file_name
+):
+    input_file = INPUTS / input_file_name
+    output_file = OUTPUTS / output_file_name
+
+    result = command("--currency", currency, input_file, format)
+    assert result == output_file.read_text()
