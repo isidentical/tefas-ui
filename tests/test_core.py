@@ -21,7 +21,7 @@ def command(capsys):
     return runner
 
 
-@freeze_time("2021-12-24")
+@freeze_time("2021-12-22")
 @pytest.mark.parametrize(
     "format, currency, input_file_name, output_file_name",
     [

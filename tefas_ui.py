@@ -304,18 +304,26 @@ class Teb(ExportFormat):
         return list(funds.values())
 
 
+def run_from_file(
+    input_file: Path, file_format: str, *, currency: str = BASE_CURRENCY
+) -> None:
+    export_format = EXPORT_FORMATS[file_format]()
+    with open(input_file) as stream:
+        funds = export_format.process(stream.read())
+
+    funds = list(drop_sold_funds(funds))
+    display_pl(funds, currency)
+
+
 def main(argv: Optional[List[str]] = None) -> None:
     parser = ArgumentParser()
     parser.add_argument("input_file")
     parser.add_argument("file_format", choices=EXPORT_FORMATS.keys())
     parser.add_argument("--currency", type=str.upper, default="TRY")
     options = parser.parse_args(argv)
-    with open(options.input_file) as stream:
-        file_format = EXPORT_FORMATS[options.file_format]()
-        funds = file_format.process(stream.read())
-
-    funds = list(drop_sold_funds(funds))
-    display_pl(funds, options.currency)
+    run_from_file(
+        options.input_file, options.file_format, currency=options.currency
+    )
 
 
 if __name__ == "__main__":
