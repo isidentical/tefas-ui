@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import sys
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser
 from collections import Counter, defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
 from functools import lru_cache, partial
-from typing import Dict, Iterator, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from rich.console import Console
 from rich.progress import track
@@ -21,12 +21,8 @@ try:
     from forex_python.converter import get_rate
 except Exception:
 
-    def get_rate(
-        c1: str, c2: str, date: Optional[datetime.date] = None
-    ) -> float:
-        assert (
-            c1 == c2 == BASE_CURRENCY
-        ), "install forex-python for other currencies"
+    def get_rate(c1: str, c2: str, date: Optional[date] = None) -> float:
+        assert c1 == c2 == BASE_CURRENCY, "install forex-python for other currencies"
         return 1.0
 
 
@@ -37,7 +33,7 @@ fx_rate = partial(lru_cache(get_rate), BASE_CURRENCY)
 class Profits:
     key: str
     title: str
-    initial_date: datetime.date
+    initial_date: date
     total_shares: int
     total_worth: float
     pl_today: float
@@ -82,9 +78,7 @@ class Fund:
             assert action.kind is ActionKind.BUY
             total_shares += action.num_shares
             total_spent += (
-                action.num_shares
-                * action.share_price
-                * fx_rate(currency, action.date)
+                action.num_shares * action.share_price * fx_rate(currency, action.date)
             )
         return total_shares, total_spent
 
@@ -92,7 +86,7 @@ class Fund:
         self,
         tefas: Crawler,
         currency: str = BASE_CURRENCY,
-        start=datetime.now(),
+        start: datetime = datetime.now(),
     ) -> Profits:
         """Calculate daily, weekly and all time P/L in the specified currency."""
 
@@ -144,7 +138,7 @@ class Fund:
         buys = data[ActionKind.BUY]
         sells = data[ActionKind.SELL]
 
-        def deduct_shares(num_shares: int):
+        def deduct_shares(num_shares: int) -> None:
             for buy in buys.copy():
                 if buy.num_shares > num_shares:
                     buy.num_shares -= num_shares
@@ -170,9 +164,7 @@ def drop_sold_funds(funds: List[Fund]) -> Iterator[Fund]:
             yield new_fund
 
 
-def get_profits(
-    funds: List[Fund], currency: str = BASE_CURRENCY
-) -> Iterator[Profits]:
+def get_profits(funds: List[Fund], currency: str = BASE_CURRENCY) -> Iterator[Profits]:
     tefas = Crawler()
     for fund in track(
         funds,
@@ -183,7 +175,7 @@ def get_profits(
 
 
 @contextmanager
-def ui(console: Console):
+def ui(console: Console) -> Iterator[Table]:
     table = Table(title="TEFAS Index")
     table.add_column("Name")
     table.add_column("Title")
@@ -198,9 +190,6 @@ def ui(console: Console):
 
 
 def display_pl(funds: List[Fund], currency: str = BASE_CURRENCY) -> None:
-    tefas = Crawler()
-    rows = []
-
     def annotate(price: float, use_color: bool = True) -> str:
         if use_color:
             if price > 0:
@@ -216,7 +205,7 @@ def display_pl(funds: List[Fund], currency: str = BASE_CURRENCY) -> None:
 
     console = Console()
     with ui(console) as table:
-        total = Counter()
+        total: Counter[Any] = Counter()
         for profits in get_profits(funds, currency):
             total.update(profits.simple)
             table.add_row(
@@ -295,7 +284,7 @@ class Teb(ExportFormat):
             )
 
     def process(self, raw_data: str) -> List[Fund]:
-        funds = {}
+        funds: Dict[str, Fund] = {}
         for key, action in self.iter_actions(raw_data.splitlines()):
             fund = funds.setdefault(key, Fund(key))
             fund.actions.append(action)
@@ -319,9 +308,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser.add_argument("file_format", choices=EXPORT_FORMATS.keys())
     parser.add_argument("--currency", type=str.upper, default="TRY")
     options = parser.parse_args(argv)
-    run_from_file(
-        options.input_file, options.file_format, currency=options.currency
-    )
+    run_from_file(options.input_file, options.file_format, currency=options.currency)
 
 
 if __name__ == "__main__":

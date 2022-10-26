@@ -1,9 +1,9 @@
 
                                   TEFAS Index                                   
 ┏━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┓
-┃ Name ┃ Title   ┃ Purcha… ┃   Total ┃    Total ┃     P/L ┃      P/L ┃     P/L ┃
-┃      ┃         ┃ Date    ┃  Shares ┃    Worth ┃ (today) ┃    (this ┃    (all ┃
-┃      ┃         ┃         ┃         ┃          ┃         ┃    week) ┃   time) ┃
+┃      ┃         ┃         ┃         ┃          ┃         ┃      P/L ┃     P/L ┃
+┃      ┃         ┃ Purcha… ┃   Total ┃    Total ┃     P/L ┃    (this ┃    (all ┃
+┃ Name ┃ Title   ┃ Date    ┃  Shares ┃    Worth ┃ (today) ┃    week) ┃   time) ┃
 ┡━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━┩
 │ TYH  │ TEB     │ 2021-0… │    3000 │ 553.7730 │ -2.0400 │ -143.12… │ -65.51… │
 │      │ ASSET   │         │         │      TRY │     TRY │      TRY │     TRY │

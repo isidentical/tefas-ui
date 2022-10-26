@@ -29,9 +29,7 @@ def command(capsys):
         ("teb", "usd", "teb.txt", "teb_usd.txt"),
     ],
 )
-def test_basic_operations(
-    command, format, currency, input_file_name, output_file_name
-):
+def test_basic_operations(command, format, currency, input_file_name, output_file_name):
     input_file = INPUTS / input_file_name
     output_file = OUTPUTS / output_file_name
 
