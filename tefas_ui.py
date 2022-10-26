@@ -120,7 +120,7 @@ class Fund:
             self.key,
             current_data.title[0],
             initial_date,
-            total_shares,
+            int(total_shares),
             total_worth,
             total_worth - pricing_info["daily"],
             total_worth - pricing_info["weekly"],
