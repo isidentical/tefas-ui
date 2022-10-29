@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from argparse import ArgumentParser
 from collections import Counter, defaultdict
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
 from functools import lru_cache, partial
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any
 
 from rich.console import Console
 from rich.progress import track
@@ -21,7 +22,7 @@ try:
     from forex_python.converter import get_rate
 except Exception:
 
-    def get_rate(c1: str, c2: str, date: Optional[date] = None) -> float:
+    def get_rate(c1: str, c2: str, date: date | None = None) -> float:
         assert c1 == c2 == BASE_CURRENCY, "install forex-python for other currencies"
         return 1.0
 
@@ -41,7 +42,7 @@ class Profits:
     pl_all_time: float
 
     @property
-    def simple(self) -> Dict[str, float]:
+    def simple(self) -> dict[str, float]:
         return {
             "total_worth": self.total_worth,
             "pl_today": self.pl_today,
@@ -66,9 +67,9 @@ class Action:
 @dataclass
 class Fund:
     key: str
-    actions: List[Action] = field(default_factory=list, repr=False)
+    actions: list[Action] = field(default_factory=list, repr=False)
 
-    def share_info(self, currency: str = BASE_CURRENCY) -> Tuple[float, float]:
+    def share_info(self, currency: str = BASE_CURRENCY) -> tuple[float, float]:
         """Return the total spent amount (with the FX conversion by the date it was spent),
         and the total number of shares."""
 
@@ -157,14 +158,14 @@ class Fund:
         return replace(self, actions=buys)
 
 
-def drop_sold_funds(funds: List[Fund]) -> Iterator[Fund]:
+def drop_sold_funds(funds: list[Fund]) -> Iterator[Fund]:
     for fund in funds.copy():
         new_fund = fund.deduct_sales()
         if new_fund.actions:
             yield new_fund
 
 
-def get_profits(funds: List[Fund], currency: str = BASE_CURRENCY) -> Iterator[Profits]:
+def get_profits(funds: list[Fund], currency: str = BASE_CURRENCY) -> Iterator[Profits]:
     tefas = Crawler()
     for fund in track(
         funds,
@@ -189,7 +190,7 @@ def ui(console: Console) -> Iterator[Table]:
     console.print(table)
 
 
-def display_pl(funds: List[Fund], currency: str = BASE_CURRENCY) -> None:
+def display_pl(funds: list[Fund], currency: str = BASE_CURRENCY) -> None:
     def annotate(price: float, use_color: bool = True) -> str:
         if use_color:
             if price > 0:
@@ -243,7 +244,7 @@ class ExportFormat:
     def __init_subclass__(cls):
         EXPORT_FORMATS[cls.__name__.lower()] = cls
 
-    def process(self, raw_data: str) -> List[Fund]:
+    def process(self, raw_data: str) -> list[Fund]:
         raise NotImplementedError
 
 
@@ -257,7 +258,7 @@ class Teb(ExportFormat):
         # 5.000,50 => 5000.50
         return float(data.replace(".", "").replace(",", ".", 1))
 
-    def iter_actions(self, lines: List[str]) -> Iterator[Tuple[str, Action]]:
+    def iter_actions(self, lines: list[str]) -> Iterator[tuple[str, Action]]:
         # Format:
         # <dd>/<mm>/<yyyy> <KEY>-<FQN> <Alış/Satış> <BRANCH>
         # <ACCOUNT> <AMOUNT_OF_SHARES> <PRICE> <CURRENCY>
@@ -283,8 +284,8 @@ class Teb(ExportFormat):
                 share_price=self.normalize_float(share_price),
             )
 
-    def process(self, raw_data: str) -> List[Fund]:
-        funds: Dict[str, Fund] = {}
+    def process(self, raw_data: str) -> list[Fund]:
+        funds: dict[str, Fund] = {}
         for key, action in self.iter_actions(raw_data.splitlines()):
             fund = funds.setdefault(key, Fund(key))
             fund.actions.append(action)
@@ -302,7 +303,7 @@ def run_from_file(
     display_pl(funds, currency)
 
 
-def main(argv: Optional[List[str]] = None) -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = ArgumentParser()
     parser.add_argument("input_file")
     parser.add_argument("file_format", choices=EXPORT_FORMATS.keys())
